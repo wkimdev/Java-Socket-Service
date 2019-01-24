@@ -17,6 +17,7 @@ public class ClientService {
 		Socket socket = null;
 		
 		try {
+			System.out.println("[client 연결 시도 시작!]");
 			socket = new Socket(); //close를 시켜버리니까 인스턴스를 새로 만듬?
 			socket.connect(new InetSocketAddress("localhost", 5001));
 			System.out.println("[client 연결 성공!]");
@@ -42,12 +43,7 @@ public class ClientService {
 			
 			os.close();
 			is.close();
-		}catch(
-	Exception e)
-	{
-
+		}catch(Exception e){
+		}
 	}
-
-}
-
 }
