@@ -40,6 +40,7 @@ public class ServerService {
 				bytes = new byte[100];
 				int readByteCount = is.read(bytes); // bytes를 받아 is의 요소를 읽는 것 같다.
 				message = new String(bytes, 0, readByteCount, "UTF-8"); // 특정한 캐릭터셋으로 byte array값을 디코딩한다.
+				
 				System.out.println("[클라로부터 받은 데이터 :]"+message);
 				
 				// 보내는 부분이기 때문에 string으로 보낸..
