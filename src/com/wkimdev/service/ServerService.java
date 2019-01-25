@@ -6,8 +6,33 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.List;
+import java.util.Vector;
+import java.util.concurrent.ExecutorService;
 
-public class ServerService {
+import javafx.application.Application;
+import javafx.stage.Stage;
+
+public class ServerService extends Application {
+	
+	ExecutorService executorService;
+	ServerSocket serverSocket;
+	List<Client> connections = new Vector<Client>();
+	
+	// 서버 시작 메서드 
+	void startServer() {
+		
+	}
+	
+	// 서버 종료 메서드
+	void stopServer() {
+		
+	}
+	
+	// 데이터 통신 코드 
+	class Client {
+		
+	}
 	
 	// ServerSocket ==> 클라의 연결 요청을 기다리면서, 연결 수락 담당 
 	// Socket	==> 연결된 클라와 통신을 담당. 
@@ -62,5 +87,11 @@ public class ServerService {
 				// TODO: handle exception
 			}
 		}
+	}
+
+	@Override
+	public void start(Stage arg0) throws Exception {
+		// TODO Auto-generated method stub
+		
 	}
 }
