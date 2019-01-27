@@ -1,97 +1,229 @@
 package com.wkimdev.service;
 
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Vector;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.geometry.Insets;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.TextArea;
+import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
 
 public class ServerService extends Application {
 	
 	ExecutorService executorService;
-	ServerSocket serverSocket;
-	List<Client> connections = new Vector<Client>();
+	ServerSocket serverSocket; // 클라이언트 연결 수락 
+	List<Client> connections = new Vector<Client>(); // 연결된 클라이언트를 저장, 스레드 초기화 
 	
 	// 서버 시작 메서드 
 	void startServer() {
-		
-	}
-	
-	// 서버 종료 메서드
-	void stopServer() {
-		
-	}
-	
-	// 데이터 통신 코드 
-	class Client {
-		
-	}
-	
-	// ServerSocket ==> 클라의 연결 요청을 기다리면서, 연결 수락 담당 
-	// Socket	==> 연결된 클라와 통신을 담당. 
-	public static void main(String[] args) throws IOException {
-		
-		// socket 연결 accept 코드 
-		// 서버에서는 바이트 데이터를 읽어야 한다. 
-		// 나중에 try구문을 나와 serversocket을 close시켜야 한다. 그래서 글로벌 변수로 선언?
-		ServerSocket serverSocket = null;
+		executorService = Executors.newFixedThreadPool(
+				Runtime.getRuntime().availableProcessors()
+		);
 		
 		try {
 			serverSocket = new ServerSocket();
-			// 바인딩 포트 
 			serverSocket.bind(new InetSocketAddress("localhost", 5001));
-			while(true) {
-				// 서버는 가동중이기 때문에 while구문이 들어간다!!!!!! (연결을 기다림...)
-				System.out.println("[server 연결 기다림 시작]");
-				Socket socket = serverSocket.accept();
-				InetSocketAddress isa = (InetSocketAddress) socket.getRemoteSocketAddress();
-				
-				System.out.println("연결 수락 성공!");
-				
-				byte[] bytes = null;
-				String message = null;
-				
-				// byte로 인풋데이터를 디코딩 한다. 
-				// 클라에서 byte쏜 메세지를 string으로 변환하기ㅏ
-				InputStream is = socket.getInputStream();
-				// 바이트가 null 배열이기 때문에 공간을 할당해놔야 한다. 
-				bytes = new byte[100];
-				int readByteCount = is.read(bytes); // bytes를 받아 is의 요소를 읽는 것 같다.
-				message = new String(bytes, 0, readByteCount, "UTF-8"); // 특정한 캐릭터셋으로 byte array값을 디코딩한다.
-				
-				System.out.println("[클라로부터 받은 데이터 :]"+message);
-				
-				// 보내는 부분이기 때문에 string으로 보낸..
-				OutputStream os = socket.getOutputStream();
-				message = "hello test from server~";
-				bytes = message.getBytes("UTF-8");
-				os.write(bytes);
-				os.flush(); // 이 출력 스트림을 플래시 해, 버퍼에 포함 된 모든 출력 바이트를 강제적으로 출력합니다.
-				// outputstream에서 자원을 close하기 위해 수행한다. 
-				System.out.println("데이터 보내기 성공");
+		} catch(Exception e){
+			if(!serverSocket.isClosed()) {
+				stopServer();
 			}
-		} catch (Exception e) {
+			return;
 		}
 		
-		if(!serverSocket.isClosed()) {
-			try {
-				serverSocket.close();
-			} catch (Exception e) {
-				// TODO: handle exception
+		
+		Runnable runnable = new Runnable() {
+			@Override
+			public void run() {
+				Platform.runLater(()->{
+					displayText("[서버 시작]");
+					btnStartStop.setText("stop");
+				});
+				while(true) {
+					try {
+						Socket socket = serverSocket.accept();
+						String message = "[연결수락: " + socket.getRemoteSocketAddress()  + ": " + Thread.currentThread().getName() + "]";
+						Platform.runLater(()->displayText(message));
+						
+						Client client = new Client(socket);
+						connections.add(client);
+						Platform.runLater(()->displayText("[client 객체 수 : " + connections.size() + "]"));
+					} catch (Exception e) {
+						if(!serverSocket.isClosed()) {
+							stopServer();
+						}
+						break;
+					}
+				}
 			}
+		};
+		executorService.submit(runnable);	// 작업스레드의 연결 작업 처리 
+	}
+	
+	
+	/*
+	 * 서버 종료 코드 
+	 * 연결된 모든 socket 닫기
+	 * serversocket닫기
+	 * executorService종료  
+	 */
+	void stopServer() {
+		try {
+			// 반복된 요소가 있는 경우 true를 리턴한다. 
+			Iterator<Client> iterator = connections.iterator();
+			// 모든 socket를 닫는다. 
+			while(iterator.hasNext()) {
+				Client client = iterator.next();
+				client.socket.close();
+				iterator.remove();
+			}
+			
+			if(serverSocket!=null && !serverSocket.isClosed()) {
+				serverSocket.close();
+			}
+			if(executorService!=null && !executorService.isShutdown()) {
+				executorService.shutdown();
+			}
+			Platform.runLater(()->{
+				displayText("[서버 멈춤]");
+				btnStartStop.setText("start");
+			});
+		} catch(Exception e) {
 		}
 	}
+	
+	// 데이터 통신 코드, 연결된 클라이언트를 표현  
+	class Client {
+		Socket socket;
+		
+		Client(Socket socket){
+			this.socket = socket;
+			receive();
+		}
+		
+		// 클라이언트 데이터를 받는 receive코드 
+		void receive() {
+			Runnable runnable = new Runnable() {
+				@Override
+				public void run() {
+					try {
+						while(true) {
+							byte[] bytes = new byte[100];
+							InputStream io = socket.getInputStream();
+							
+							int readByteCount = io.read(bytes);
+							
+							// 클라이언트 비정상적 종료, IOException 발생  
+							if(readByteCount == -1) {
+								throw new IOException();
+							}
+							
+							String message = "[요청 처리: " + socket.getRemoteSocketAddress() + ": " + Thread.currentThread().getName() + "]";
+							Platform.runLater(()->displayText(message));
+							
+							// 요청을 받고 서버를 닫지 않으면 블로킹됨.. 
+							//풀이 두개로 찍힌느데. 
+							
+							String data = new String(bytes, 0, readByteCount, "UTF-8");
+							
+							// 모든 클라리언트 들에게 data 보냄
+							for(Client client : connections) {
+								client.send(data); 
+							}
+						}
+					} catch (Exception e) {
+						// 클라이언트에서 통신이 안될 경우 처리 
+						try {
+							connections.remove(Client.this);
+							String message = "[클라이언트 통신 안됨: " + socket.getRemoteSocketAddress() + ": " + Thread.currentThread().getName() + "]";
+							Platform.runLater(()->displayText(message));
+							socket.close();
+						} catch (Exception e2) {
+						}
+					}
+				}
+			};
+			executorService.submit(runnable);
+		}
+		
+		// 클라이언트로 메세지를 보내는 send 코드 
+		void send(String data) {
+			Runnable runnable = new Runnable() {
+				@Override
+				public void run() {
+					try {
+						byte[] bytes = data.getBytes("UTF-8");
+						OutputStream os = socket.getOutputStream();
+						os.write(bytes);
+						os.flush();
+					} catch (Exception e) {
+						// 클라이언트에서 통신이 안될 경우 처리 
+						try {
+							String message = "[클라이언트 통신 안됨: " + socket.getRemoteSocketAddress() + ": " + Thread.currentThread().getName() + "]";
+							Platform.runLater(()->displayText(message));
+							connections.remove(Client.this);
+							socket.close();
+						} catch (Exception e2) {
+						}
+					}
+				}
+			};
+			executorService.submit(runnable);
+		}
+	}
+	
+	/////UI코드/////////////////////////////////////////////////
+	TextArea txtDisplay;
+	Button btnStartStop;
 
 	@Override
-	public void start(Stage arg0) throws Exception {
-		// TODO Auto-generated method stub
+	public void start(Stage primaryStage) throws Exception {
+		BorderPane root = new BorderPane();
+		root.setPrefSize(500, 300);
 		
+		txtDisplay = new TextArea();
+		txtDisplay.setEditable(false);
+		BorderPane.setMargin(txtDisplay, new Insets(0,0,2,0));
+		root.setCenter(txtDisplay);
+		
+		btnStartStop = new Button("start");
+		btnStartStop.setPrefHeight(30);
+		btnStartStop.setMaxWidth(Double.MAX_VALUE);
+		btnStartStop.setOnAction(e->{
+			if(btnStartStop.getText().equals("start")) {
+				startServer();
+			} else if(btnStartStop.getText().equals("stop")){
+				stopServer();
+			}
+		});
+		root.setBottom(btnStartStop);
+		
+		Scene scene = new Scene(root);
+		scene.getStylesheets().add(getClass().getResource("app.css").toString());
+		primaryStage.setScene(scene);
+		primaryStage.setTitle("Server");
+		primaryStage.setOnCloseRequest(event->stopServer());
+		primaryStage.show();
+	}
+	
+	void displayText(String text) {
+		txtDisplay.appendText(text + "\n");
+	}	
+	
+	public static void main(String[] args) {
+		launch(args);
 	}
 }
