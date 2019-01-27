@@ -104,7 +104,7 @@ public class ClientService extends Application {
 					stopClient();
 				}
 			}
-		};
+		}; 
 		thread.start();
 	}
 	
